@@ -133,3 +133,19 @@ await run_backfill(connector, database, start=start_utc, end=end_utc)
 For the continuous X poller, set `MONGODB_URI` to the Atlas connection string. It writes posts to `apiprocessing.realdata1` by default. Authors and interaction edges are stored in `apiprocessing.authors` and `apiprocessing.interaction_edges`. Override the database or post collection with `MONGODB_DATABASE` or `MONGODB_POSTS_COLLECTION`.
 
 All source timestamps must be timezone-aware. They are normalized to UTC at model validation time; naive timestamps are rejected. `post_id`, `author_id`, and edge endpoints are platform-prefixed to prevent cross-platform collisions.
+
+## External web console
+
+The read-only dashboard is served by FastAPI and reads `apitoprocessing.realdata1` through the backend; MongoDB credentials never reach the browser.
+
+Run locally:
+
+```fish
+.venv/bin/python -m pip install -e ".[web]"
+set -x MONGODB_URI 'mongodb+srv://USER:PASSWORD@cluster.mongodb.net/'
+set -x MONGODB_DATABASE apitoprocessing
+set -x MONGODB_POSTS_COLLECTION realdata1
+.venv/bin/uvicorn web.app:app --reload --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000`. To host it on Render, connect this repository, use the included `render.yaml`, and add `MONGODB_URI` as a secret environment variable. The dashboard exposes only read endpoints: `/api/health`, `/api/summary`, `/api/posts`, and `/api/edges`.

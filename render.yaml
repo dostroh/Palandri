@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: dadri-console
+    runtime: python
+    buildCommand: pip install -e ".[web]"
+    startCommand: uvicorn web.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: apitoprocessing
+      - key: MONGODB_POSTS_COLLECTION
+        value: realdata1

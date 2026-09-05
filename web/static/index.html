@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#182026">
+  <title>Dadri / Intelligence Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js"></script>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">D</div><div><strong>DADRI</strong><span>INTELLIGENCE CONSOLE</span></div></div>
+      <div class="workspace-label">WORKSPACE</div>
+      <nav>
+        <a class="nav-item active" href="#overview"><i data-lucide="layout-dashboard"></i><span>Overview</span><b>01</b></a>
+        <a class="nav-item" href="#timeline"><i data-lucide="scan-search"></i><span>Live timeline</span><b>02</b></a>
+        <a class="nav-item" href="#network"><i data-lucide="share-2"></i><span>Interaction graph</span><b>03</b></a>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="pipeline-card"><div class="eyebrow">PIPELINE STATUS</div><div class="pipeline-title"><span class="pulse"></span>Collection active</div><div class="pipeline-meta"><span id="db-name">apiprocessing</span><span id="db-collection">realdata1</span></div></div>
+      <div class="sidebar-footer"><span>PHASE 1 / CONTINUOUS INGESTION</span><span>v0.1.0</span></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar"><div class="crumb"><span>WORKSPACE</span><i data-lucide="chevron-right"></i><strong>OVERVIEW</strong></div><div class="topbar-actions"><span class="last-sync"><span class="status-dot"></span><span id="sync-label">Syncing...</span></span><button class="icon-button" id="refresh-button" title="Refresh data"><i data-lucide="refresh-cw"></i></button><button class="avatar" title="Workspace operator">OP</button></div></header>
+      <section class="hero" id="overview"><div><div class="eyebrow">SOCIAL SIGNAL MONITORING / UTC</div><h1>Signal, before<br><em>the noise.</em></h1><p>Observe raw social activity as it arrives. Search across channels, trace the first-order conversation, and keep the timeline honest.</p></div><div class="hero-readout"><span class="readout-label">LIVE WINDOW</span><strong id="live-window">--:--:--</strong><span>UTC / AUTO-REFRESH 30S</span></div></section>
+
+      <section class="metric-grid" aria-label="Collection summary">
+        <article class="metric-card accent"><div class="metric-top"><span>INGESTED POSTS</span><i data-lucide="inbox"></i></div><strong id="total-posts">—</strong><small>Across connected sources</small></article>
+        <article class="metric-card"><div class="metric-top"><span>LANGUAGE SIGNAL</span><i data-lucide="languages"></i></div><strong id="top-language">—</strong><small id="top-language-count">Waiting for data</small></article>
+        <article class="metric-card"><div class="metric-top"><span>SOURCES</span><i data-lucide="radio-tower"></i></div><strong id="source-count">—</strong><small id="source-detail">X / Telegram</small></article>
+        <article class="metric-card"><div class="metric-top"><span>NETWORK EDGES</span><i data-lucide="git-merge"></i></div><strong id="edge-count">—</strong><small>Explicit interactions captured</small></article>
+      </section>
+
+      <section class="content-grid" id="timeline">
+        <div class="panel timeline-panel"><div class="panel-header"><div><div class="eyebrow">RAW EVENT STREAM</div><h2>Chronological timeline</h2></div><div class="panel-tools"><span class="live-chip"><span class="pulse"></span>LIVE</span><button class="icon-button small" id="clear-search" title="Clear filters"><i data-lucide="x"></i></button></div></div><div class="filter-row"><label class="search-box"><i data-lucide="search"></i><input id="search-input" type="search" placeholder="Search raw text..."></label><select id="language-filter"><option value="all">All languages</option><option value="en">English</option><option value="hi">Hindi</option><option value="es">Spanish</option></select><select id="platform-filter"><option value="all">All platforms</option><option value="Twitter">Twitter</option><option value="Telegram">Telegram</option></select></div><div class="table-wrap"><table><thead><tr><th>EVENT / UTC</th><th>SIGNAL</th><th>AUTHOR</th><th>ORIGIN</th><th>ENGAGEMENT</th></tr></thead><tbody id="posts-body"><tr><td colspan="5" class="loading">Connecting to MongoDB…</td></tr></tbody></table></div><div class="panel-footer"><span id="result-count">—</span><button class="text-button" id="load-more">Load more <i data-lucide="arrow-down"></i></button></div></div>
+        <div class="side-stack" id="network"><div class="panel source-panel"><div class="panel-header"><div><div class="eyebrow">DISTRIBUTION</div><h2>By source</h2></div><i class="muted-icon" data-lucide="pie-chart"></i></div><div id="source-bars" class="bar-list"><div class="loading">No source data</div></div></div><div class="panel edge-panel"><div class="panel-header"><div><div class="eyebrow">LINK ANALYSIS</div><h2>Latest edges</h2></div><i class="muted-icon" data-lucide="route"></i></div><div id="edge-list" class="edge-list"><div class="loading">No edges yet</div></div><button class="outline-button" id="refresh-edges">Refresh graph signals <i data-lucide="arrow-up-right"></i></button></div></div>
+      </section>
+      <footer class="page-footer"><span>DADRI / READ-ONLY OBSERVATION LAYER</span><span>MongoDB Atlas · UTC-normalized</span></footer>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
