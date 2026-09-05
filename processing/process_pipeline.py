@@ -1,4 +1,5 @@
 import os
+import re
 import statistics
 from collections import Counter
 
@@ -46,6 +47,17 @@ TOPIC_CATEGORIES = list(TOPIC_IDS.keys())
 
 BURST_Z_THRESHOLD = 1.5
 
+# spaCy NER labels worth treating as a stance target when no noun chunk is available.
+TARGET_ENTITY_LABELS = {"PERSON", "ORG", "GPE", "EVENT", "NORP", "FAC", "LAW", "PRODUCT"}
+
+# Explicit self-reported age mentions, e.g. "23 years old" or the common social-media
+# shorthand "23F"/"31M". No dedicated age-prediction model is loaded, so this regex plus
+# a profession-based fallback is the best signal available from the text itself.
+AGE_PATTERNS = [
+    re.compile(r"\b(\d{2})\s*(?:yo|y/o|years?\s*old|yrs?\s*old)\b", re.IGNORECASE),
+    re.compile(r"\b(\d{2})\s*[FM]\b"),
+]
+
 
 def build_network_graph(posts):
     """Builds a NetworkX interaction graph to identify Key Opinion Leaders (KOLs)."""
@@ -73,6 +85,18 @@ def build_network_graph(posts):
 def extract_keywords(doc):
     """spaCy noun-chunk keyword extraction, skipping stopword-rooted chunks and @mentions."""
     return [chunk.text for chunk in doc.noun_chunks if not chunk.root.is_stop and not chunk.text.startswith("@")]
+
+
+def extract_target_entity(doc, keywords, topic_category):
+    """What the post is actually about, for stance to classify against: prefer a
+    concrete noun phrase, then a named entity (spaCy NER), and only fall back to the
+    zero-shot topic category if the text has neither (e.g. empty/media-only posts)."""
+    if keywords:
+        return keywords[0]
+    for ent in doc.ents:
+        if ent.label_ in TARGET_ENTITY_LABELS:
+            return ent.text
+    return topic_category
 
 
 def extract_sentiment(text):
@@ -166,14 +190,55 @@ def infer_telegram_profession(channel):
     return "Student" if any(marker in channel_name for marker in TELEGRAM_STUDENT_MARKERS) else "General User"
 
 
-def extract_demographics(post):
+def extract_stated_age(text):
+    for pattern in AGE_PATTERNS:
+        match = pattern.search(text or "")
+        if match:
+            age = int(match.group(1))
+            if 10 <= age <= 100:
+                return age
+    return None
+
+
+def bracket_for_age(age):
+    if age < 18:
+        return "13-17"
+    if age <= 24:
+        return "18-24"
+    if age <= 34:
+        return "25-34"
+    if age <= 44:
+        return "35-44"
+    if age <= 54:
+        return "45-54"
+    return "55+"
+
+
+def infer_age_bracket(profession, bio_text, text):
+    """Explicit self-reported age beats a profession-derived guess beats Unknown --
+    there is no ground truth for age from text alone, so this is a heuristic, not a
+    prediction: it should never claim more confidence than a single fixed default did."""
+    age = extract_stated_age(f"{bio_text or ''} {text or ''}")
+    if age is not None:
+        return bracket_for_age(age)
+
+    profession_lower = (profession or "").lower()
+    if "student" in profession_lower or "undergrad" in profession_lower:
+        return "18-24"
+    if any(marker in profession_lower for marker in ("professional", "developer", "engineer", "tech")):
+        return "25-34"
+    return "Unknown"
+
+
+def extract_demographics(post, text):
     """Infers location, profession, and age bracket per-platform."""
     platform = post.get("platform", "Twitter")
     author = post.get("author") or {}
+    bio_text = author.get("bio")
 
     if platform == "Twitter":
         location = infer_location(author.get("location_raw"))
-        profession = infer_twitter_profession(author.get("bio"))
+        profession = infer_twitter_profession(bio_text)
     elif platform == "Telegram":
         location = "Unknown"
         profession = infer_telegram_profession(post.get("channel") or {})
@@ -183,7 +248,7 @@ def extract_demographics(post):
         profession = "Developer" if "developers" in subreddit else "General User"
 
     return {
-        "inferred_age_bracket": "18-24",
+        "inferred_age_bracket": infer_age_bracket(profession, bio_text, text),
         "inferred_location": location,
         "inferred_profession": profession,
         "language": post.get("language") or "en"
@@ -312,11 +377,11 @@ def run_processing():
 
         doc = nlp(text)
         keywords = extract_keywords(doc)
-        target_entity = keywords[0] if keywords else "SIH Event"
+        topic_category, topic_id = extract_topic(text)
+        target_entity = extract_target_entity(doc, keywords, topic_category)
 
         sentiment = extract_sentiment(text)
         stance = extract_stance(text, target_entity)
-        topic_category, topic_id = extract_topic(text)
         network_signals = extract_network_signals(post, user_id, centrality_scores)
         risk_score = compute_risk_score(sentiment["polarity_score"], stance["label"], network_signals["bot_likelihood_score"])
 
@@ -327,7 +392,7 @@ def run_processing():
             "stance": stance,
             "topic_category": topic_category,
             "topic_id": topic_id,
-            "demographics": extract_demographics(post),
+            "demographics": extract_demographics(post, text),
             "network_signals": network_signals,
             "risk_score": risk_score,
         })
