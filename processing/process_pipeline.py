@@ -1,9 +1,7 @@
-import json
 import os
 
 import spacy
 import networkx as nx
-import pandas as pd
 import pymongo
 from dotenv import load_dotenv
 from transformers import pipeline
@@ -16,6 +14,10 @@ nlp = spacy.load("en_core_web_sm")
 # Hugging Face models for emotion and zero-shot stance classification
 emotion_model = pipeline("text-classification", model="SamLowe/roberta-base-go_emotions", top_k=3)
 stance_model = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+
+STANCE_LABELS = ["against", "supportive", "neutral"]
+TWITTER_PROFESSION_MARKERS = ("undergrad", "student")
+TELEGRAM_STUDENT_MARKERS = ("sih", "hackathon", "student", "college", "aspirant")
 
 
 def build_network_graph(posts):
@@ -41,6 +43,11 @@ def build_network_graph(posts):
     return pagerank
 
 
+def extract_keywords(doc):
+    """spaCy noun-chunk keyword extraction, skipping stopword-rooted chunks and @mentions."""
+    return [chunk.text for chunk in doc.noun_chunks if not chunk.root.is_stop and not chunk.text.startswith("@")]
+
+
 def extract_sentiment(text):
     """Detects primary emotion, confidence, and distribution."""
     results = emotion_model(text, truncation=True)[0]
@@ -61,26 +68,154 @@ def extract_sentiment(text):
     }
 
 
+def extract_stance(text, target_entity):
+    """Zero-shot stance classification against the extracted target entity."""
+    stripped = text.strip()
+    if not stripped:
+        # Media-only posts (e.g. Telegram forwards with no caption) have nothing to classify.
+        return {"target_entity": target_entity, "label": "neutral", "confidence": 0.0}
+
+    # bart-large-mnli tops out at 1024 tokens; this pipeline has no truncation kwarg, so cap chars manually.
+    result = stance_model(stripped[:2000], candidate_labels=STANCE_LABELS)
+    return {
+        "target_entity": target_entity,
+        "label": result["labels"][0],
+        "confidence": round(result["scores"][0], 2),
+    }
+
+
+def infer_location(location_raw):
+    """Twitter's location_raw is free text like 'Delhi, India' -> keep just the city."""
+    if not location_raw:
+        return "Unknown"
+    city = location_raw.split(",")[0].strip()
+    return city or "Unknown"
+
+
+def infer_twitter_profession(bio_text):
+    if not bio_text:
+        return "Unknown"
+    bio_doc = nlp(bio_text)
+    for chunk in bio_doc.noun_chunks:
+        lowered = chunk.text.lower()
+        if any(marker in lowered for marker in TWITTER_PROFESSION_MARKERS):
+            return f"Student / {chunk.text}"
+    return "Tech Professional"
+
+
+def infer_telegram_profession(channel):
+    channel_name = (channel.get("channel_name") or "").lower()
+    return "Student" if any(marker in channel_name for marker in TELEGRAM_STUDENT_MARKERS) else "General User"
+
+
 def extract_demographics(post):
-    """Infers location, profession, and age bracket."""
-    author = post.get("author", {})
+    """Infers location, profession, and age bracket per-platform."""
     platform = post.get("platform", "Twitter")
+    author = post.get("author") or {}
 
     if platform == "Twitter":
-        location = author.get("location_raw") or author.get("bio", "Unknown")
-        bio = (author.get("bio") or "").lower()
-        profession = "Student / Undergrad" if "undergrad" in bio or "student" in bio else "Tech Professional"
+        location = infer_location(author.get("location_raw"))
+        profession = infer_twitter_profession(author.get("bio"))
+    elif platform == "Telegram":
+        location = "Unknown"
+        profession = infer_telegram_profession(post.get("channel") or {})
     else:
         location = "Unknown"
-        subreddit = post.get("subreddit", "")
-        profession = "Developer" if "developers" in subreddit.lower() else "General User"
+        subreddit = (post.get("subreddit") or "").lower()
+        profession = "Developer" if "developers" in subreddit else "General User"
 
     return {
         "inferred_age_bracket": "18-24",
-        "inferred_location": location if location != "" else "Unknown",
+        "inferred_location": location,
         "inferred_profession": profession,
-        "language": post.get("language", "en")
+        "language": post.get("language") or "en"
     }
+
+
+def extract_network_signals(post, user_id, centrality_scores):
+    platform = post.get("platform", "Twitter")
+    author = post.get("author") or {}
+    interaction = post.get("interaction") or {}
+
+    bot_likelihood_score = 0.95 if author.get("is_bot") else 0.05
+    kol_weight = round(centrality_scores.get(user_id, 0.1), 3)
+
+    signals = {
+        "bot_likelihood_score": bot_likelihood_score,
+        "centrality_seed_weight": kol_weight,
+        "is_potential_kol": kol_weight > 0.25,
+    }
+
+    if platform == "Telegram":
+        signals["forward_chain_depth"] = 1 if interaction.get("is_forwarded") else 0
+
+    return signals
+
+
+def compute_risk_score(polarity_score, stance_label, bot_likelihood_score):
+    """Combines negative sentiment, an against-stance, and bot likelihood into one score."""
+    score = (max(0.0, -polarity_score) * 10) + (5 if stance_label == "against" else 0) + (bot_likelihood_score * 10)
+    return round(score)
+
+
+def build_output_document(post, ml_insights):
+    """Trims each platform's raw ingestion payload down to the processing->analytics contract."""
+    platform = post.get("platform", "Twitter")
+    author = post.get("author") or {}
+    interaction = post.get("interaction") or {}
+
+    output = {
+        "post_id": post.get("post_id"),
+        "platform": platform,
+        "timestamp": post.get("timestamp"),
+        "text": post.get("text"),
+    }
+
+    if platform == "Twitter":
+        output["author"] = {
+            "user_id": author.get("user_id"),
+            "username": author.get("username"),
+            "bio": author.get("bio"),
+            "follower_count": author.get("follower_count"),
+        }
+        output["interaction"] = {
+            "is_reply": interaction.get("is_reply", False),
+            "reply_to_post_id": interaction.get("reply_to_post_id"),
+            "reply_to_user_id": interaction.get("reply_to_user_id"),
+            "mentions": interaction.get("mentions", []),
+        }
+    elif platform == "Telegram":
+        channel = post.get("channel") or {}
+        output["channel"] = {
+            "channel_id": channel.get("channel_id"),
+            "channel_name": channel.get("channel_name"),
+            "channel_type": channel.get("channel_type"),
+            "member_count": channel.get("member_count"),
+        }
+        output["author"] = {
+            "user_id": author.get("user_id"),
+            "username": author.get("username"),
+            "display_name": author.get("display_name"),
+            "is_bot": author.get("is_bot", False),
+        }
+        output["interaction"] = {
+            "is_reply": interaction.get("is_reply", False),
+            "reply_to_post_id": interaction.get("reply_to_post_id"),
+            "reply_to_user_id": interaction.get("reply_to_user_id"),
+            "is_forwarded": interaction.get("is_forwarded", False),
+            "forwarded_from_channel": interaction.get("forwarded_from_channel"),
+        }
+    else:
+        # Fallback for any other platform: pass author/interaction through as-is (minus engagement).
+        if "channel" in post:
+            output["channel"] = post["channel"]
+        output["author"] = author
+        output["interaction"] = interaction
+        if "subreddit" in post:
+            output["subreddit"] = post["subreddit"]
+
+    output["ml_insights"] = ml_insights
+    return output
 
 
 def run_processing():
@@ -113,47 +248,36 @@ def run_processing():
     print("Running NLP & Network analysis over posts...")
 
     for post in posts:
-        # Remove MongoDB's internal _id to prevent insertion conflicts
-        post.pop("_id", None)
-
         text = post.get("text", "")
         user_id = post.get("author", {}).get("user_id", "Unknown")
 
-        # spaCy Keyword Extraction
         doc = nlp(text)
-        keywords = [chunk.text for chunk in doc.noun_chunks if not chunk.root.is_stop and not chunk.text.startswith("@")]
-        target = keywords[0] if keywords else "SIH Event"
+        keywords = extract_keywords(doc)
+        target_entity = keywords[0] if keywords else "SIH Event"
 
-        # Calculate PageRank Weight
-        kol_weight = round(centrality_scores.get(user_id, 0.1), 3)
+        sentiment = extract_sentiment(text)
+        stance = extract_stance(text, target_entity)
+        network_signals = extract_network_signals(post, user_id, centrality_scores)
+        risk_score = compute_risk_score(sentiment["polarity_score"], stance["label"], network_signals["bot_likelihood_score"])
 
-        # Assemble ML Insights block
-        post["ml_insights"] = {
-            "sentiment": extract_sentiment(text),
-            "stance": {
-                "target_entity": target,
-                "label": "against" if "stress" in text.lower() or "panic" in text.lower() else "supportive",
-                "confidence": 0.85
-            },
+        ml_insights = {
+            "sentiment": sentiment,
+            "stance": stance,
             "demographics": extract_demographics(post),
             "trends": {
                 "extracted_keywords": keywords[:3],
                 "topic_category": "Education / Hackathons",
                 "topic_id": "TOPIC-0091"
             },
-            "network_signals": {
-                "bot_likelihood_score": 0.04,
-                "centrality_seed_weight": kol_weight,
-                "is_potential_kol": kol_weight > 0.25
-            },
+            "network_signals": network_signals,
             "burst_signal": {
                 "topic_id": "TOPIC-0091",
                 "z_score": 1.2,
                 "is_burst": False
             },
-            "risk_score": 14
+            "risk_score": risk_score
         }
-        processed_posts.append(post)
+        processed_posts.append(build_output_document(post, ml_insights))
 
     # 4. Save Final Output to processingtoanalytics -> fakedata
     try:
