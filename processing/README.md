@@ -4,12 +4,14 @@ NLP enrichment and network-analysis stage that runs after `dadri`'s ingestion ph
 
 ## Layout
 
-- `process_pipeline.py`: loads posts, builds an interaction graph (NetworkX PageRank) to score KOL centrality, runs emotion/stance classification (Hugging Face `transformers`) and spaCy keyword extraction, then writes each post trimmed to the processing->analytics contract with an added `ml_insights` block.
+- `process_pipeline.py`: loads posts, builds an interaction graph (NetworkX PageRank) to score KOL centrality, runs emotion/stance/topic classification (Hugging Face `transformers`) and spaCy keyword extraction, computes batch-level topic burst z-scores, then writes each post trimmed to the processing->analytics contract with an added `ml_insights` block.
 - `seed_fakedata.py`: generates 50 sample Twitter + Reddit posts matching the ingestion schema and inserts them into `apitoprocessing.fakedata` for local testing.
 
 ## Output contract
 
 Twitter and Telegram posts are trimmed to their own field sets before `ml_insights` is attached. Twitter keeps `author.{user_id,username,bio,follower_count}` and `interaction.{is_reply,reply_to_post_id,reply_to_user_id,mentions}`; Telegram keeps `channel.{channel_id,channel_name,channel_type,member_count}`, `author.{user_id,username,display_name,is_bot}`, and `interaction.{is_reply,reply_to_post_id,reply_to_user_id,is_forwarded,forwarded_from_channel}`. The raw `engagement` block is dropped for both, and Telegram additionally carries `ml_insights.network_signals.forward_chain_depth`.
+
+`ml_insights.sentiment.polarity_score` is a confidence-weighted average over a valence lookup for all 28 GoEmotions labels (not just a positive/negative guess off the top label). `trends.topic_category`/`topic_id` come from zero-shot classification against a fixed category list (`TOPIC_IDS` in `process_pipeline.py`), and `burst_signal` is a real z-score of how over-represented each topic_id is within the batch just processed (`is_burst` trips past a 1.5 z-score) — both replace what used to be hardcoded placeholder values.
 
 ## Setup
 

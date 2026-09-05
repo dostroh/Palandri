@@ -1,4 +1,6 @@
 import os
+import statistics
+from collections import Counter
 
 import spacy
 import networkx as nx
@@ -11,13 +13,38 @@ load_dotenv()
 print("1. Initializing NLP Models & Graph Matrix...")
 nlp = spacy.load("en_core_web_sm")
 
-# Hugging Face models for emotion and zero-shot stance classification
+# Hugging Face models for emotion, zero-shot stance, and zero-shot topic classification
 emotion_model = pipeline("text-classification", model="SamLowe/roberta-base-go_emotions", top_k=3)
 stance_model = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
 
 STANCE_LABELS = ["against", "supportive", "neutral"]
 TWITTER_PROFESSION_MARKERS = ("undergrad", "student")
 TELEGRAM_STUDENT_MARKERS = ("sih", "hackathon", "student", "college", "aspirant")
+
+# GoEmotions' 27 emotions + neutral, mapped to a -1 (negative) .. +1 (positive) valence.
+EMOTION_VALENCE = {
+    "admiration": 0.75, "amusement": 0.7, "anger": -0.85, "annoyance": -0.5,
+    "approval": 0.6, "caring": 0.65, "confusion": -0.15, "curiosity": 0.1,
+    "desire": 0.4, "disappointment": -0.6, "disapproval": -0.55, "disgust": -0.8,
+    "embarrassment": -0.5, "excitement": 0.8, "fear": -0.75, "gratitude": 0.85,
+    "grief": -0.9, "joy": 0.9, "love": 0.9, "nervousness": -0.55,
+    "optimism": 0.7, "pride": 0.75, "realization": 0.05, "relief": 0.6,
+    "remorse": -0.7, "sadness": -0.8, "surprise": 0.15, "neutral": 0.0,
+}
+
+# Zero-shot topic categories -> stable topic ids (shared by every post in that category,
+# so burst detection below can group posts by which topic_id they were assigned).
+TOPIC_IDS = {
+    "Education / Hackathons": "TOPIC-0091",
+    "Technology": "TOPIC-0102",
+    "Politics / Society": "TOPIC-0203",
+    "Finance / Markets": "TOPIC-0304",
+    "Entertainment": "TOPIC-0405",
+    "General Discussion": "TOPIC-0500",
+}
+TOPIC_CATEGORIES = list(TOPIC_IDS.keys())
+
+BURST_Z_THRESHOLD = 1.5
 
 
 def build_network_graph(posts):
@@ -49,15 +76,21 @@ def extract_keywords(doc):
 
 
 def extract_sentiment(text):
-    """Detects primary emotion, confidence, and distribution."""
+    """Detects primary emotion, confidence, and a valence-weighted polarity score."""
     results = emotion_model(text, truncation=True)[0]
     primary_emotion = results[0]['label']
     confidence = round(results[0]['score'], 2)
 
     distribution = {res['label']: round(res['score'], 2) for res in results}
 
-    negative_labels = {"anxiety", "fear", "anger", "frustration", "annoyance"}
-    polarity = round(-0.5 - (confidence * 0.5), 2) if primary_emotion in negative_labels else round(0.5 + (confidence * 0.5), 2)
+    # Weight each returned emotion's valence by its own confidence, rather than a
+    # binary "is primary emotion negative" guess.
+    total_weight = sum(distribution.values())
+    if total_weight > 0:
+        polarity = sum(EMOTION_VALENCE.get(label, 0.0) * score for label, score in distribution.items()) / total_weight
+    else:
+        polarity = 0.0
+    polarity = max(-1.0, min(1.0, round(polarity, 2)))
 
     return {
         "primary_emotion": primary_emotion,
@@ -82,6 +115,31 @@ def extract_stance(text, target_entity):
         "label": result["labels"][0],
         "confidence": round(result["scores"][0], 2),
     }
+
+
+def extract_topic(text):
+    """Zero-shot topic classification, reusing the same NLI model loaded for stance."""
+    stripped = text.strip()
+    if not stripped:
+        category = "General Discussion"
+    else:
+        result = stance_model(stripped[:2000], candidate_labels=TOPIC_CATEGORIES)
+        category = result["labels"][0]
+    return category, TOPIC_IDS[category]
+
+
+def compute_burst_signals(topic_ids):
+    """Per-topic z-score of how often that topic_id shows up in this batch, vs. the
+    batch's average topic frequency. Flags topics over-represented in this run."""
+    counts = Counter(topic_ids)
+    values = list(counts.values())
+    mean = statistics.mean(values)
+    stdev = statistics.pstdev(values)
+
+    z_by_topic = {}
+    for topic_id, count in counts.items():
+        z_by_topic[topic_id] = round((count - mean) / stdev, 2) if stdev > 0 else 0.0
+    return z_by_topic
 
 
 def infer_location(location_raw):
@@ -243,10 +301,11 @@ def run_processing():
     # 2. Compute Graph Centrality across all posts
     centrality_scores = build_network_graph(posts)
 
-    # 3. Process Each Post
-    processed_posts = []
+    # 3. First pass: run per-post NLP (sentiment, stance, topic, demographics, network signals).
+    # Topic assignment has to happen before burst detection, since burst is a batch-level
+    # statistic (how over-represented is this topic across the posts we just loaded).
     print("Running NLP & Network analysis over posts...")
-
+    analyses = []
     for post in posts:
         text = post.get("text", "")
         user_id = post.get("author", {}).get("user_id", "Unknown")
@@ -257,29 +316,49 @@ def run_processing():
 
         sentiment = extract_sentiment(text)
         stance = extract_stance(text, target_entity)
+        topic_category, topic_id = extract_topic(text)
         network_signals = extract_network_signals(post, user_id, centrality_scores)
         risk_score = compute_risk_score(sentiment["polarity_score"], stance["label"], network_signals["bot_likelihood_score"])
 
-        ml_insights = {
+        analyses.append({
+            "post": post,
+            "keywords": keywords,
             "sentiment": sentiment,
             "stance": stance,
+            "topic_category": topic_category,
+            "topic_id": topic_id,
             "demographics": extract_demographics(post),
-            "trends": {
-                "extracted_keywords": keywords[:3],
-                "topic_category": "Education / Hackathons",
-                "topic_id": "TOPIC-0091"
-            },
             "network_signals": network_signals,
-            "burst_signal": {
-                "topic_id": "TOPIC-0091",
-                "z_score": 1.2,
-                "is_burst": False
-            },
-            "risk_score": risk_score
-        }
-        processed_posts.append(build_output_document(post, ml_insights))
+            "risk_score": risk_score,
+        })
 
-    # 4. Save Final Output to processingtoanalytics -> fakedata
+    # 4. Batch-level burst detection: which topic_ids are over-represented in this run.
+    burst_z_by_topic = compute_burst_signals([a["topic_id"] for a in analyses])
+
+    # 5. Assemble ml_insights per post now that batch-level stats are available.
+    processed_posts = []
+    for analysis in analyses:
+        z_score = burst_z_by_topic[analysis["topic_id"]]
+        ml_insights = {
+            "sentiment": analysis["sentiment"],
+            "stance": analysis["stance"],
+            "demographics": analysis["demographics"],
+            "trends": {
+                "extracted_keywords": analysis["keywords"][:3],
+                "topic_category": analysis["topic_category"],
+                "topic_id": analysis["topic_id"]
+            },
+            "network_signals": analysis["network_signals"],
+            "burst_signal": {
+                "topic_id": analysis["topic_id"],
+                "z_score": z_score,
+                "is_burst": z_score > BURST_Z_THRESHOLD
+            },
+            "risk_score": analysis["risk_score"]
+        }
+        processed_posts.append(build_output_document(analysis["post"], ml_insights))
+
+    # 6. Save Final Output to processingtoanalytics -> fakedata
     try:
         db_out = client["processingtoanalytics"]
         col_out = db_out["fakedata"]
