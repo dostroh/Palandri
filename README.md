@@ -49,6 +49,7 @@ set -x MONGODB_POSTS_COLLECTION realdata1
 set -x X_USERNAME sihwinner
 set -x X_COOKIES_FILE .data/x_cookies.json
 set -x X_TOPICS 'finance,SIH,Link Analysis'
+set -x X_LANGUAGE en
 set -x X_RESULTS_PER_POLL 1
 set -x X_POLL_INTERVAL 5
 set -x X_MAX_POLLS 100
@@ -56,6 +57,7 @@ set -x X_MAX_POLLS 100
 set -x TELEGRAM_API_ID 'your-api-id'
 set -x TELEGRAM_API_HASH 'your-api-hash'
 set -x TELEGRAM_ENTITIES '@channel_one,@channel_two,@group_three'
+set -x TELEGRAM_LANGUAGE en
 set -x TELEGRAM_POLL_INTERVAL 5
 set -x TELEGRAM_MAX_POLLS 100
 
@@ -63,6 +65,8 @@ python -m dadri.workers.run_all
 ```
 
 `X_TOPICS` becomes one X search such as `("finance" OR "SIH" OR "Link Analysis") -filter:retweets`. Each value in `TELEGRAM_ENTITIES` gets its own concurrent polling task. Press `Ctrl+C` to stop all pollers.
+
+`X_LANGUAGE=en` uses X's native `lang:en` search operator. `TELEGRAM_LANGUAGE=en` uses local language detection, so install it with `pip install -e ".[language]"`; Telegram does not provide a reliable language filter in Telethon itself.
 
 ## Start X polling
 

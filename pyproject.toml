@@ -15,6 +15,7 @@ dependencies = [
 [project.optional-dependencies]
 x = ["twscrape>=0.20,<1"]
 telegram = ["telethon>=1.36,<2"]
+language = ["langdetect>=1.0.9,<2"]
 dev = ["pytest>=8,<9", "pytest-asyncio>=0.23,<1", "ruff>=0.6,<1"]
 
 [tool.hatch.build.targets.wheel]

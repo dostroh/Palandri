@@ -19,10 +19,27 @@ class TelegramConnector(BaseConnector):
     platform = "telegram"
 
     def __init__(self, client: Any | None = None, *, entity: Any = None,
-                 poll_interval: float = 5.0) -> None:
+                 poll_interval: float = 5.0, language: str | None = None) -> None:
         self._client = client
         self._entity = entity
         self._poll_interval = poll_interval
+        self._language = language.lower() if language else None
+
+    def _matches_language(self, text: str) -> bool:
+        if not self._language:
+            return True
+        try:
+            from langdetect import detect
+        except ImportError as exc:
+            raise RuntimeError(
+                "Install the 'language' extra to filter Telegram messages by language"
+            ) from exc
+        if not text.strip():
+            return False
+        try:
+            return detect(text) == self._language
+        except Exception:
+            return False
 
     def _get_client(self) -> Any:
         if self._client is None:
@@ -147,6 +164,8 @@ class TelegramConnector(BaseConnector):
                 continue
             if end and created > end:
                 break
+            if not self._matches_language(getattr(message, "raw_text", "") or ""):
+                continue
             post, author, edges = await self._normalize(message, resolved)
             yield ConnectorBatch(posts=[post], authors=[author], edges=edges)
 

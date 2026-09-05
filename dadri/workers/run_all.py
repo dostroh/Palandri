@@ -30,6 +30,10 @@ def _x_query(topics: list[str]) -> str:
     return f"({' OR '.join(clauses)}) -filter:retweets"
 
 
+def _with_x_language(query: str, language: str | None) -> str:
+    return f"{query} lang:{language}" if language else query
+
+
 async def main() -> None:
     database_name = os.environ.get("MONGODB_DATABASE", "apitoprocessing")
     posts_collection = os.environ.get("MONGODB_POSTS_COLLECTION", "realdata1")
@@ -38,8 +42,13 @@ async def main() -> None:
     max_polls = int(os.environ.get("X_MAX_POLLS", "100"))
     telegram_max_polls = int(os.environ.get("TELEGRAM_MAX_POLLS", str(max_polls)))
     results_per_poll = int(os.environ.get("X_RESULTS_PER_POLL", "1"))
+    x_language = os.environ.get("X_LANGUAGE")
+    telegram_language = os.environ.get("TELEGRAM_LANGUAGE")
     topics = _items("X_TOPICS")
-    x_query = _x_query(topics) if topics else os.environ.get("X_QUERY", "-filter:retweets")
+    x_query = _with_x_language(
+        _x_query(topics) if topics else os.environ.get("X_QUERY", "-filter:retweets"),
+        x_language,
+    )
     telegram_entities = _items("TELEGRAM_ENTITIES")
     if not telegram_entities:
         raise RuntimeError("Set TELEGRAM_ENTITIES to comma-separated channels or groups")
@@ -79,6 +88,7 @@ async def main() -> None:
             client=telegram_client,
             entity=entity,
             poll_interval=telegram_interval,
+            language=telegram_language,
         )
         print(f"Telegram entity: {entity}", flush=True)
         await run_stream(

@@ -37,6 +37,7 @@ async def main() -> None:
         client=telegram_client,
         entity=entity,
         poll_interval=poll_interval,
+        language=os.environ.get("TELEGRAM_LANGUAGE"),
     )
     try:
         print(

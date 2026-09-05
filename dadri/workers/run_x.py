@@ -32,6 +32,8 @@ async def main() -> None:
         cookies_file=cookies_file,
     )
     query = os.environ.get("X_QUERY", "-filter:retweets")
+    if os.environ.get("X_LANGUAGE"):
+        query = f"{query} lang:{os.environ['X_LANGUAGE']}"
     max_polls = int(os.environ.get("X_MAX_POLLS", "100"))
     results_per_poll = int(os.environ.get("X_RESULTS_PER_POLL", "1"))
     try:
