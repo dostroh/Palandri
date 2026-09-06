@@ -212,7 +212,8 @@ async function loadSummary() {
   const top = languages[0];
   $('#top-language').textContent = top ? top[0].toUpperCase() : '—';
   $('#top-language-count').textContent = top ? `${formatCount(top[1])} observed events` : 'Waiting for data';
-  $('#db-name').textContent = data.database || 'apiprocessing';
+  $('#db-name').textContent = data.database || 'apitoprocessing';
+  if (data.collection) $('#db-collection').textContent = data.collection;
   renderBars(data.platforms);
   $('#sync-label').textContent = `Synced ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }

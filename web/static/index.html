@@ -24,12 +24,11 @@
         <a class="nav-item" data-view="dashboard" href="#network"><i data-lucide="share-2"></i><span>Interaction graph</span><b>04</b></a>
       </nav>
       <div class="sidebar-spacer"></div>
-      <div class="pipeline-card"><div class="eyebrow">PIPELINE STATUS</div><div class="pipeline-title"><span class="pulse"></span>Collection active</div><div class="pipeline-meta"><span id="db-name">apiprocessing</span><span id="db-collection">realdata1</span></div></div>
       <div class="sidebar-footer"><span>CONTINUOUS INGESTION</span><span>v0.1.0</span></div>
     </aside>
 
     <main class="main-content">
-      <header class="topbar"><div class="crumb"><span>WORKSPACE</span><i data-lucide="chevron-right"></i><strong id="crumb-view">OVERVIEW</strong></div><div class="topbar-actions"><span class="last-sync"><span class="status-dot"></span><span id="sync-label">Syncing...</span></span><button class="icon-button" id="refresh-button" title="Refresh data"><i data-lucide="refresh-cw"></i></button><button class="avatar" title="Workspace operator">OP</button></div></header>
+      <header class="topbar"><div class="crumb"><span>WORKSPACE</span><i data-lucide="chevron-right"></i><strong id="crumb-view">OVERVIEW</strong></div><div class="topbar-actions"><span class="pipeline-strip" title="Ingestion pipeline status"><span class="pulse"></span><b>Collection active</b><span class="pipeline-db" id="db-name">apitoprocessing</span><span class="pipeline-db" id="db-collection">realdata1</span></span><span class="last-sync"><span class="status-dot"></span><span id="sync-label">Syncing...</span></span><button class="icon-button" id="refresh-button" title="Refresh data"><i data-lucide="refresh-cw"></i></button><button class="avatar" title="Workspace operator">OP</button></div></header>
 
       <div class="view" id="view-dashboard">
         <section class="hero" id="overview"><div><div class="eyebrow">SOCIAL SIGNAL MONITORING / UTC</div><h1>Signal, before<br><em>the noise.</em></h1><p>Observe raw social activity as it arrives. Search across channels, trace the first-order conversation, and keep the timeline honest.</p></div><div class="hero-readout"><span class="readout-label">LIVE WINDOW</span><strong id="live-window">--:--:--</strong><span>UTC / AUTO-REFRESH 30S</span></div></section>
@@ -50,7 +49,7 @@
 
         <section class="intel-grid" aria-label="Network and emotion analysis">
           <div class="panel">
-            <div class="panel-header"><div><div class="eyebrow">BOT CLUSTERS</div><h2>Interaction network</h2></div><div class="graph-legend"><span class="dot red"></span>Patient-zero<span class="dot amber"></span>Amplifier<span class="dot green"></span>Organic<button type="button" class="relayout-button" id="graph-relayout" title="Unpin every node and lay the graph out again">re-layout</button></div></div>
+            <div class="panel-header"><div><div class="eyebrow">POST CLUSTERS</div><h2>Interaction network</h2></div><div class="graph-legend"><span class="dot red"></span>Patient-zero<span class="dot amber"></span>Amplifier<span class="dot green"></span>Organic<button type="button" class="relayout-button" id="graph-relayout" title="Unpin every node and lay the graph out again">re-layout</button></div></div>
             <div class="chart" id="bot-graph"></div>
             <div class="chart-foot" id="graph-foot">—</div>
           </div>
