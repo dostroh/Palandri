@@ -1,6 +1,6 @@
-# Dadri
+# Palan-dri
 
-Social media intelligence for X and Telegram. Dadri collects posts, normalizes them into one schema regardless of source, scores them with NLP and graph analysis, and serves the result as a live console.
+Social media intelligence for X and Telegram. Palan-dri collects posts, normalizes them into one schema regardless of source, scores them with NLP and graph analysis, and serves the result as a live console.
 
 ```
 X / Telegram  →  apitoprocessing.realdata1  →  NLP + graph scoring  →  processingtoanalytics.fakedata  →  web console
