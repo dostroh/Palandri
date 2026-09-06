@@ -1,7 +1,7 @@
 const DASH_LIMIT = 5;
 const ALL_LIMIT = 50;
 const TEXT_LIMIT = 75;
-const state = { skip: 0, total: 0, query: '', language: 'all', platform: 'all', cache: new Map() };
+const state = { skip: 0, total: 0, query: '', language: 'all', platform: 'all', cache: new Map(), polled: null };
 const $ = (selector) => document.querySelector(selector);
 
 function escapeHtml(value = '') { return String(value).replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char])); }
@@ -31,17 +31,18 @@ function rowChips(item) {
   return `<span class="pr-chips">${chips.join('')}</span>`;
 }
 
-function renderRows(items, host, append = false) {
+function renderRows(items, host, append = false, highlight = null) {
   if (!append) host.innerHTML = '';
   if (!items.length && !append) { host.innerHTML = '<div class="loading">No events match this view.</div>'; return; }
   const html = items.map((item) => {
     const key = item.post_id || `anon-${++keySeq}`;
     state.cache.set(key, item);
+    const isNew = highlight ? ' is-new' : '';
     // Collapse newlines so a multi-line post still previews as one clean line.
     const text = String(item.text || item.content || '').replace(/\s+/g, ' ').trim();
     const clipped = text.length > TEXT_LIMIT;
     const preview = clipped ? `${text.slice(0, TEXT_LIMIT).trimEnd()}…` : text;
-    return `<button class="post-row" type="button" data-key="${escapeHtml(key)}"${text ? ` title="${escapeHtml(text)}"` : ''}>`
+    return `<button class="post-row${isNew}" type="button" data-key="${escapeHtml(key)}"${text ? ` title="${escapeHtml(text)}"` : ''}>`
       + `<span class="pr-time">${escapeHtml(shortTime(item.timestamp || item.created_at))}</span>`
       + platformTag(item.platform)
       + `<span class="pr-author">@${escapeHtml(authorName(item))}</span>`
@@ -218,7 +219,26 @@ async function loadSummary() {
   $('#sync-label').textContent = `Synced ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+function clearPinnedPoll() {
+  state.polled = null;
+  $('#poll-pin').hidden = true;
+}
+
 async function loadDashboardPosts() {
+  // Straight after a poll, show what was just fetched. The timeline is ordered by when a
+  // post was written, not when it was ingested, so fresh results about an older event can
+  // land well below the fold — which is exactly when you most want to see them.
+  if (state.polled) {
+    const shown = state.polled.items.slice(0, DASH_LIMIT);
+    renderRows(shown, $('#posts-body'), false, true);
+    $('#poll-pin-text').textContent =
+      `Showing ${shown.length} of ${state.polled.items.length} post(s) from your last ${state.polled.label} poll`;
+    $('#poll-pin').hidden = false;
+    $('#result-count').textContent = `${formatCount(shown.length)} of ${formatCount(state.polled.items.length)} just polled`;
+    return;
+  }
+
+  $('#poll-pin').hidden = true;
   const response = await fetch(`/api/posts?${filterParams(DASH_LIMIT, 0)}`);
   if (!response.ok) throw new Error('Posts unavailable');
   const data = await response.json();
@@ -273,6 +293,7 @@ function syncFilterInputs() {
 function applyFilters() {
   syncFilterInputs();
   state.skip = 0;
+  clearPinnedPoll();  // a search means you are looking for something else now
   if (currentView() === 'all') return loadAllPosts(false);
   // The radar/KPIs are query-scoped too, so a search re-profiles the emotional response.
   return Promise.all([loadDashboardPosts(), loadIntel()]);
@@ -523,7 +544,9 @@ $('#poll-form').addEventListener('submit', async (event) => {
     if (!data.fetched) {
       setPollStatus(data.message || 'No new posts matched.', 'ok');
     } else {
-      setPollStatus(`Fetched ${data.fetched} post(s) from ${label}, analysed ${data.analyzed}.${dropped} Timeline updated.`, 'ok');
+      // Pin these to the top of the timeline; ordering by post time would otherwise bury them.
+      state.polled = { items: data.items || [], label };
+      setPollStatus(`Fetched ${data.fetched} post(s) from ${label}, analysed ${data.analyzed}.${dropped} Pinned to the timeline.`, 'ok');
     }
     await loadAll();
   } catch (error) {
@@ -539,6 +562,7 @@ $('#poll-form').addEventListener('submit', async (event) => {
   }
 });
 
+$('#poll-pin-clear').addEventListener('click', () => { clearPinnedPoll(); loadDashboardPosts(); });
 $('#all-load-more').addEventListener('click', () => loadAllPosts(true));
 $('#refresh-button').addEventListener('click', () => { $('#refresh-button').classList.add('rotating'); loadAll().finally(() => $('#refresh-button').classList.remove('rotating')); });
 $('#refresh-edges').addEventListener('click', loadEdges);

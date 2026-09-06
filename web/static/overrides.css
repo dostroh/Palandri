@@ -124,6 +124,25 @@
 @media(max-width:1000px){.pulse-grid{grid-template-columns:1fr 1fr}.intel-grid{grid-template-columns:1fr}}
 @media(max-width:680px){.pulse-grid{grid-template-columns:1fr 1fr;gap:6px}.kpi-card strong{font-size:21px}.chart{height:280px}}
 
+/* ---------- pinned results from the last poll ---------- */
+.poll-pin{
+  display:flex;align-items:center;gap:9px;
+  padding:8px 16px;background:#16262a;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  border-left:2px solid var(--cyan);
+  font:9px var(--mono);color:var(--cyan);letter-spacing:.4px;
+}
+.poll-pin .pulse{width:5px;height:5px;box-shadow:none}
+#poll-pin-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#poll-pin-clear{
+  flex:0 0 auto;padding:3px 8px;cursor:pointer;
+  background:transparent;border:1px solid #2f5a5a;color:var(--muted);
+  font:8px var(--mono);letter-spacing:.5px;
+}
+#poll-pin-clear:hover{color:var(--cyan);border-color:var(--cyan)}
+/* Pinned rows keep the exact column rhythm: the 2px accent comes out of the padding. */
+.post-row.is-new{border-left:2px solid var(--cyan);padding-left:14px}
+
 /* ---------- live poll bar ---------- */
 .poll-panel{margin-bottom:14px}
 .poll-panel .panel-header{align-items:center;flex-wrap:wrap;gap:10px}
