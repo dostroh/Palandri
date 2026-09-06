@@ -17,7 +17,7 @@ x = ["twscrape>=0.20,<1"]
 telegram = ["telethon>=1.36,<2"]
 language = ["langdetect>=1.0.9,<2"]
 web = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1"]
-# Phase 2 NLP/graph scoring. torch and scipy are not imported directly but are
+# NLP and graph scoring. torch and scipy are not imported directly but are
 # required at runtime: transformers needs a backend, and networkx.pagerank needs scipy.
 processing = [
     "pymongo>=4.18,<5",
