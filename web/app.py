@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
         client.close()
 
 
-app = FastAPI(title="Palan-dri Intelligence Console", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Palandri", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("DADRI_ALLOWED_ORIGINS", "*").split(","),
