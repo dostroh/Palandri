@@ -1,0 +1,235 @@
+/* Compact single-line event rows, full-archive view, and the event detail drawer. */
+
+[hidden]{display:none!important}
+
+/* Panels size to their content instead of stretching to match the tallest column,
+   so a 5-row timeline no longer leaves a tall empty box below it. */
+.content-grid{align-items:start}
+.nav-item span{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ---------- shared column rhythm (rows + header line up) ---------- */
+.post-list{display:flex;flex-direction:column}
+.list-head,.post-row{display:flex;align-items:center;gap:10px;padding:0 16px}
+.list-head{height:29px;border-bottom:1px solid var(--line);font:9px var(--mono);letter-spacing:1.2px;color:var(--faint)}
+
+.pr-time{flex:0 0 74px;font:9px var(--mono);color:var(--faint);white-space:nowrap}
+.pr-plat,.pr-plat-h{flex:0 0 28px}
+.pr-author{flex:0 0 108px;font:10px var(--mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-text{flex:1 1 auto;min-width:0;font-size:11.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-more{flex:0 0 34px;font:8px var(--mono);letter-spacing:.5px;color:var(--cyan)}
+.pr-chips,.pr-chips-h{flex:0 0 158px;display:flex;gap:4px;align-items:center;justify-content:flex-end}
+.pr-caret,.pr-caret-h{flex:0 0 10px;text-align:right}
+
+/* ---------- the one-line row itself ---------- */
+.post-row{
+  height:32px;width:100%;
+  background:none;border:0;border-bottom:1px solid #253238;
+  color:var(--muted);font-family:var(--sans);text-align:left;cursor:pointer;
+}
+.post-row:hover{background:#1d2a2f}
+.post-row:focus-visible{outline:1px solid var(--cyan);outline-offset:-2px}
+.post-row .pr-text.empty{color:var(--faint);font-style:italic}
+.post-row .pr-caret{color:var(--faint);font:13px var(--mono)}
+.post-row:hover .pr-caret{color:var(--cyan)}
+.post-row:hover .pr-more{text-decoration:underline}
+
+/* ---------- nothing may force a horizontal scrollbar ---------- */
+.app-shell,.main-content,.view,.panel,.post-list{max-width:100%;min-width:0}
+.bar-item{max-width:500px}          /* distribution bars stop scaling past 500px */
+.edge-route{flex-wrap:wrap}
+.edge-route span{min-width:0;overflow-wrap:anywhere}
+.edge-type,.pipeline-meta span{overflow-wrap:anywhere}
+
+.pr-plat{
+  display:inline-flex;justify-content:center;
+  padding:2px 0;border:1px solid #375151;color:var(--cyan);
+  font:8px var(--mono);letter-spacing:.5px;
+}
+.pr-plat.tg{color:var(--amber);border-color:#69542f}
+
+/* ---------- NLP chips (previously dead: overrides.css was never linked) ---------- */
+.chip{
+  display:inline-flex;max-width:104px;padding:2px 5px;
+  border:1px solid #375151;color:var(--cyan);font:8px var(--mono);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:normal;
+}
+.chip.emotion{color:#d9a6e8;border-color:#624b6b}
+.chip.stance{color:var(--amber);border-color:#69542f}
+.chip.topic{color:var(--cyan);border-color:#375151}
+.chip.pos{color:var(--green);border-color:#456d4a}
+.chip.neg{color:var(--red);border-color:#704046}
+.chip.risk{color:var(--red);border-color:#704046}
+
+/* narrow screens: shed columns rather than wrapping the row onto two lines */
+@media(max-width:1280px){.timeline-panel .pr-chips,.timeline-panel .pr-chips-h{display:none}}
+@media(max-width:900px){
+  .pr-chips,.pr-chips-h{display:none}
+  .pr-author{flex-basis:92px}
+  .pr-time{flex-basis:70px}
+  .list-head,.post-row{padding:0 14px;gap:9px}
+}
+
+/* ---------- KPI pulse row ---------- */
+.pulse-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:0 0 14px}
+.kpi-card{border:1px solid var(--line);background:linear-gradient(135deg,#182126,#151e22);padding:12px 13px;min-width:0}
+.kpi-card strong{display:block;font:600 26px var(--mono);color:var(--text);margin:10px 0 8px;overflow-wrap:anywhere}
+.kpi-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.kpi-foot small{color:var(--faint);font-size:10px}
+.kpi-badge{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 6px;
+  border:1px solid #375151;color:var(--cyan);font:8px var(--mono);letter-spacing:.6px;
+}
+.kpi-badge.red{color:var(--red);border-color:#704046}
+.kpi-badge.amber{color:var(--amber);border-color:#69542f}
+.kpi-badge.green{color:var(--green);border-color:#456d4a}
+.kpi-badge::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.kpi-badge.pulsing::before{animation:kpiPulse 1.6s ease-in-out infinite}
+@keyframes kpiPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(1.5)}}
+@media(prefers-reduced-motion:reduce){.kpi-badge.pulsing::before{animation:none}}
+
+/* ---------- charts ---------- */
+.intel-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:14px;padding-bottom:14px}
+.intel-grid .panel{min-width:0;display:flex;flex-direction:column}
+.chart{width:100%;height:320px;min-width:0}
+.chart-foot{padding:9px 16px 13px;border-top:1px solid var(--line);color:var(--faint);font:9px var(--mono);overflow-wrap:anywhere}
+.graph-legend{display:flex;align-items:center;gap:7px;font:8px var(--mono);color:var(--faint);letter-spacing:.5px;flex-wrap:wrap}
+.graph-legend .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.graph-legend .dot.red{background:#ef767a}
+.graph-legend .dot.amber{background:#eab464}
+.graph-legend .dot.green{background:#9bd18b}
+.relayout-button{
+  margin-left:4px;padding:3px 7px;cursor:pointer;
+  background:transparent;border:1px solid var(--line);color:var(--muted);
+  font:8px var(--mono);letter-spacing:.5px;
+}
+.relayout-button:hover{color:var(--cyan);border-color:var(--cyan)}
+.radar-toggle{display:flex;align-items:center;gap:6px;font:8px var(--mono);color:var(--faint);letter-spacing:.5px;cursor:pointer}
+.radar-toggle input{accent-color:var(--cyan);cursor:pointer}
+
+@media(max-width:1000px){.pulse-grid{grid-template-columns:1fr 1fr}.intel-grid{grid-template-columns:1fr}}
+@media(max-width:680px){.pulse-grid{grid-template-columns:1fr 1fr;gap:6px}.kpi-card strong{font-size:21px}.chart{height:280px}}
+
+/* ---------- live poll bar ---------- */
+.poll-panel{margin-bottom:14px}
+.poll-panel .panel-header{align-items:center;flex-wrap:wrap;gap:10px}
+.poll-hint{font:9px var(--mono);color:var(--faint);letter-spacing:.4px}
+.poll-form{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 16px 14px}
+.poll-source{display:flex;flex:0 0 auto}
+.poll-tab{
+  height:30px;padding:0 12px;cursor:pointer;
+  background:#121a1e;border:1px solid var(--line);border-right:0;
+  color:var(--muted);font:9px var(--mono);letter-spacing:.6px;
+}
+.poll-tab:last-child{border-right:1px solid var(--line)}
+.poll-tab.active{background:#22343a;color:var(--cyan);border-color:#2f5a5a}
+.poll-input{flex:1 1 260px;min-width:0}
+.poll-form select{height:30px;border:1px solid var(--line);background:transparent;color:var(--muted);padding:0 8px}
+.poll-run{
+  height:30px;padding:0 14px;cursor:pointer;display:flex;align-items:center;gap:7px;
+  background:#1f3b3a;border:1px solid #2f5a5a;color:var(--cyan);
+  font:9px var(--mono);letter-spacing:.6px;
+}
+.poll-run:hover:not(:disabled){background:#26504d}
+.poll-run:disabled{opacity:.55;cursor:progress}
+.poll-run svg{width:12px}
+.poll-status{margin:0 16px 14px;padding:9px 11px;border-left:2px solid var(--line);background:#141d21;font:10px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.poll-status.ok{border-left-color:var(--green);color:var(--green)}
+.poll-status.err{border-left-color:var(--red);color:var(--red)}
+.poll-status.busy{border-left-color:var(--amber);color:var(--amber)}
+
+/* ---------- full archive view ---------- */
+.all-header{display:flex;justify-content:space-between;align-items:end;gap:24px;padding:44px 0 26px;border-bottom:1px solid var(--line)}
+.all-header>div:first-child{flex:1 1 auto;min-width:0}
+.all-title{font-size:clamp(28px,3.4vw,42px);line-height:1;letter-spacing:-1.5px;margin:15px 0 14px}
+.all-sub{max-width:520px;margin:0;color:var(--muted);line-height:1.7}
+.back-link{margin:0;width:auto;padding:0 14px;text-decoration:none;flex:0 0 auto}
+.all-panel{margin-top:14px}
+.all-panel .post-list{min-height:340px}
+
+/* ---------- compact desktop scale ----------
+   Guarded at >1000px so styles.css's own tablet/mobile breakpoints keep working
+   (they already set their own sidebar/main widths and paddings below that). */
+@media(min-width:1001px){
+  .sidebar{width:216px;padding:22px 15px 17px}
+  .brand{margin:0 6px 30px}
+  .nav-item{height:36px;padding:0 9px;gap:10px}
+  .pipeline-card{padding:12px 11px;margin-bottom:16px}
+  .pipeline-title{margin:8px 0 9px}
+
+  .main-content{width:min(1140px,calc(100% - 216px));padding:0 30px 20px}
+  .topbar{height:58px}
+
+  .hero{padding:30px 0 26px}
+  .hero h1{font-size:clamp(28px,3.1vw,44px);letter-spacing:-1.7px;margin:11px 0 14px}
+  .hero p{font-size:12.5px;line-height:1.6;max-width:460px}
+  .hero-readout strong{font-size:22px}
+
+  .metric-grid{gap:8px;padding:14px 0}
+  .metric-card{min-height:92px;padding:12px 13px}
+  .metric-card strong{font-size:23px;margin:12px 0 4px}
+
+  .content-grid{grid-template-columns:minmax(0,1fr) 262px;gap:14px}
+  .panel-header{padding:14px 16px 11px}
+  .panel h2{font-size:15px;margin:6px 0 0}
+  .filter-row{padding:0 16px 11px;gap:7px}
+  .search-box input,.filter-row select{height:30px}
+  .filter-row select{min-width:96px}
+  .panel-footer{padding:10px 16px}
+  .bar-list{padding:0 16px 15px}
+  .bar-item{margin:11px 0}
+  .source-panel{min-height:0}
+  .edge-list{padding:0 16px}
+  .edge-item{padding:11px 0}
+  .edge-panel .outline-button{margin:12px 16px 15px;width:calc(100% - 32px);height:31px}
+  .page-footer{padding:16px 0}
+
+  .all-header{padding:28px 0 18px}
+  .all-title{font-size:clamp(25px,2.5vw,33px);letter-spacing:-1px;margin:10px 0 9px}
+  .all-sub{font-size:12.5px;line-height:1.6;max-width:470px}
+
+  .drawer{width:min(500px,100vw)}
+}
+
+/* ---------- detail drawer ---------- */
+.drawer-backdrop{position:fixed;inset:0;background:rgba(8,12,14,.66);z-index:40}
+.drawer{
+  position:fixed;top:0;right:0;z-index:41;
+  height:100vh;width:min(560px,100vw);
+  display:flex;flex-direction:column;overflow-y:auto;
+  background:var(--panel);border-left:1px solid var(--line);
+}
+.drawer-head{
+  position:sticky;top:0;z-index:1;
+  display:flex;justify-content:space-between;align-items:start;gap:16px;
+  padding:20px 22px 16px;background:var(--panel);border-bottom:1px solid var(--line);
+}
+.drawer-head h2{font-size:17px;margin:7px 0 6px;letter-spacing:-.4px;word-break:break-all}
+.drawer-body{padding:20px 22px 44px}
+.drawer-text{
+  margin:0 0 22px;padding:3px 0 3px 13px;
+  border-left:2px solid var(--cyan);
+  color:var(--text);font-size:13px;line-height:1.65;
+  white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.drawer-text.empty{color:var(--faint);font-style:italic;border-left-color:var(--line)}
+
+.d-section{margin:0 0 22px}
+.d-section h4{margin:0 0 9px;font:9px var(--mono);font-weight:500;letter-spacing:1.2px;color:var(--faint)}
+.d-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.d-item{padding:8px 10px;background:#141d21;border:1px solid var(--line)}
+.d-item span{display:block;margin-bottom:4px;font:8px var(--mono);letter-spacing:.6px;color:var(--faint)}
+.d-item strong{font:11px var(--mono);font-weight:500;color:var(--text);overflow-wrap:anywhere}
+.d-chips{display:flex;flex-wrap:wrap;gap:5px}
+.d-chips .chip{max-width:none;font-size:9px;padding:4px 7px}
+
+.emo-row{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.emo-name{flex:0 0 104px;font:9px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.emo-track{flex:1;height:5px;background:#27343a}
+.emo-fill{display:block;height:100%;background:var(--cyan)}
+.emo-val{flex:0 0 32px;text-align:right;font:9px var(--mono);color:var(--faint)}
+
+@media(max-width:680px){
+  .all-header{flex-direction:column;align-items:start;gap:16px;padding:26px 0 20px}
+  .d-grid{grid-template-columns:1fr}
+  .drawer{width:100vw}
+}
